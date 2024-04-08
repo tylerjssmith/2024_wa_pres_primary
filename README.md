@@ -1,1 +1,3 @@
-# 2024 Washington Presidential Primary
+# Washington State Presidential Primary 2024
+
+This repo contains data and code to generate maps showing the results of the 2024 Washington state presidential primary election in the City of Seattle at the precinct level. The election results were obtained from [King County Elections](https://cdn.kingcounty.gov/-/media/king-county/depts/elections/results/2024/03/final-results-report.csv?rev=07daf5e88884431ea8e51177f495107b&hash=D084B25DC1D77A92D71288539A8638E1) and a shapefile containing the precinct maps was obtained from [King County GIS Open Data](https://gis-kingcounty.opendata.arcgis.com/datasets/a9bcf8b7e83a402aaf68479c244b3131_418/explore?location=47.428276%2C-121.802050%2C9.56). The maps are available for non-commercial use with attribution under a [CC BY-NC](https://creativecommons.org/licenses/by-nc/4.0/) license.

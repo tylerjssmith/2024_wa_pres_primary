@@ -1,0 +1,168 @@
+---
+title: "Washington State Presidential Primary 2024"
+subtitle: "Maps of City of Seattle Precinct-level Results"
+format: 
+  html:
+    toc: true
+toc-title: "Table of Contents"
+---
+
+This page contains maps showing the results of the 2024 Washington state presidential primary election in the City of Seattle at the precinct level. The election results were obtained from [King County Elections](https://cdn.kingcounty.gov/-/media/king-county/depts/elections/results/2024/03/final-results-report.csv?rev=07daf5e88884431ea8e51177f495107b&hash=D084B25DC1D77A92D71288539A8638E1) and a shapefile containing the precinct maps was obtained from [King County GIS Open Data](https://gis-kingcounty.opendata.arcgis.com/datasets/a9bcf8b7e83a402aaf68479c244b3131_418/explore?location=47.428276%2C-121.802050%2C9.56). The maps are available for non-commercial use with attribution under a [CC BY-NC](https://creativecommons.org/licenses/by-nc/4.0/) license.
+
+```{r setup, include = FALSE}
+# Load Packages
+library(tidyverse)
+library(sf)
+library(kableExtra)
+library(ggspatial)
+library(gridExtra)
+```
+
+```{r load_maps, include = FALSE}
+# load maps data
+maps = st_read("data/maps/Voting_Districts_of_King_County___votdst_area.shp")
+
+# process data
+maps = maps %>%
+  select(
+    precinct = NAME,
+    geometry
+  )
+
+```
+
+```{r load_results, include = FALSE}
+# load results data
+results_n = read_csv("data/results.csv")
+
+# process data
+results_n = results_n %>%
+  
+  # get Democratic, not Republican, primary results
+  filter(grepl("Democratic", Race)) %>%
+  
+  # select and standardize variables
+  select(
+    precinct = Precinct,
+    candidate = CounterType,
+    n = SumOfCount
+  ) %>%
+  
+  # standardize candidate values
+  mutate(
+    candidate = 
+      ifelse(grepl("Biden", candidate), "Joe Biden",
+      ifelse(grepl("Phillips", candidate), "Dean Phillips",
+      ifelse(grepl("Williamson", candidate), "Marianne Williamson",
+      ifelse(grepl("Uncommitted", candidate), "Uncommitted",
+      ifelse(grepl("Write-in", candidate), "Write-in", NA)))))
+    ) %>%
+  
+  # filter to candidates only
+  filter(candidate %in% c("Joe Biden","Dean Phillips","Marianne Williamson",
+    "Uncommitted","Write-in")) %>%
+  
+  # order candidates (for mapping)
+  mutate(candidate = factor(candidate,
+    levels = c("Joe Biden","Dean Phillips","Marianne Williamson","Uncommitted",
+      "Write-in")))
+
+# convert counts to percentages
+results = results_n %>%
+  group_by(precinct) %>%
+  mutate(percentage = n / sum(n) * 100) %>%
+  ungroup()
+```
+
+```{r join_maps_results, include = FALSE}
+# join results to maps
+results = results %>%
+  left_join(maps, by = "precinct") %>%
+  st_as_sf()
+```
+
+\pagebreak
+
+### Overall Result
+
+Overall, the primary election was a dominant victory for Joe Biden. In the City of Seattle, Biden received ~80% of the vote. In second place, Uncommitted received ~14% of the vote. Dean Phillips, Marianne Williamson, and write-in candidates received ~1-2% of the vote.
+
+```{r overall, echo = FALSE}
+results_n %>%
+  group_by(candidate) %>%
+  summarise(n = sum(n)) %>%
+  mutate(`%` = round(n / sum(n) * 100, 1)) %>%
+  kbl(col.names = c("Candidate","Votes (n)","Votes (%)")) %>%
+  kable_styling()
+```
+
+### Maps: Consistent Scale
+
+The following maps show the results by precinct for each candidate. The results scale is 0-100%. The map is consistent with the overall result: a dominant and widespread victory by Joe Biden, who received a majority in nearly every precinct. Uncommitted was in a second place with particular strength in the U District, Capitol Hill, and the Rainier Valley.
+
+```{r consistent-scale, echo = FALSE, fig.align = "center", fig.height = 12, fig.width = 12, fig.dpi = 400, out.height = "100%", out.width = "100%"}
+results %>%
+  filter(grepl("SEA ", precinct)) %>%
+  ggplot() +
+  geom_sf(aes(fill = percentage)) +
+  scale_fill_viridis_c(option = "D", limits = c(0,100)) +
+  facet_wrap(. ~ candidate) +
+  labs(fill = "Percentage (%)") +
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "bottom",
+    strip.text = element_text(size = 14), 
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 12)
+  )
+```
+
+\pagebreak
+
+### Maps: Candidate-specific Scales
+
+The following maps result the results by precinct for each candidate, but the results scale is specific to each candidate and may be a subset of 0-100%. This is done to help indicate how each candidate performed relative to the same candidate's performance elsewhere in the city.
+
+```{r make-map-function, echo = FALSE}
+make_map = function(data, candidate_name) {
+  data %>%
+    filter(grepl("SEA ", precinct)) %>%
+    filter(candidate == candidate_name) %>%
+    ggplot() +
+    geom_sf(aes(fill = percentage)) +
+    scale_fill_viridis_c(option = "D") +
+    labs(
+      title = candidate_name,
+      fill = paste(candidate_name, "(%)"),
+      caption = "Note: Scale may be subset of [0,100] to emphasize\nrelative performance within candidate.") +
+    theme_bw() +
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      legend.position = "bottom",
+      plot.caption = element_text(hjust = 0.5),
+      plot.caption.position = "panel"
+    )
+}
+```
+
+```{r candidate-scale, echo = FALSE, fig.align = "center", fig.height = 12, fig.width = 12, fig.dpi = 400, out.height = "100%", out.width = "100%"}
+# Generate Candidate Maps
+biden = results %>% 
+  make_map(candidate_name = "Joe Biden")
+phillips = results %>% 
+  make_map(candidate_name = "Dean Phillips")
+williamson = results %>% 
+  make_map(candidate_name = "Marianne Williamson")
+uncommitted = results %>% 
+  make_map(candidate_name = "Uncommitted")
+write_in = results %>% 
+  make_map(candidate_name = "Write-in")
+
+# Arrange Candidate Maps
+grid.arrange(biden, phillips, williamson, uncommitted, write_in, ncol = 3)
+```
